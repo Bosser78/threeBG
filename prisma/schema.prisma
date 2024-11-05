@@ -1,0 +1,67 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  // url      = env("DATABASE_URL") // URL ของ MongoDB
+  //  url ="mongodb+srv://admin:password@<cluster>.mongodb.net/<database>?retryWrites=true&w=majority"
+  //  url ="mongodb://root:example@mongo:27017/threetech?authSource=admin"
+  // url ="mongodb://root:example@mongo:27017/threetech"
+url = "mongodb://root:example@localhost:27017/threetech?authSource=admin&directConnection=true"
+
+
+}
+// schema.prisma
+model User {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  username    String   @unique
+  email       String   @unique
+  password    String
+  refreshtoken              String?
+  accesstoken               String?
+  role        Role     @default(USER)
+  posts       Post[]   // ความสัมพันธ์กับ Post
+  comments    Comment[] // ความสัมพันธ์กับ Comment
+  createdAt   DateTime @default(now())
+}
+
+model Post {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  content     String
+  author      User     @relation(fields: [authorId], references: [id])
+  authorId    String
+  category    Category? @relation(fields: [categoryId], references: [id]) // ความสัมพันธ์กับ Category
+  categoryId  String?   // รหัสหมวดหมู่ (nullable)
+  comments    Comment[] // ความสัมพันธ์กับ Comment
+  createdAt   DateTime @default(now())
+}
+
+model Comment {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  content     String
+  author      User      @relation(fields: [authorId], references: [id])
+  authorId    String
+  post        Post      @relation(fields: [postId], references: [id])
+  postId      String
+  createdAt   DateTime @default(now())
+}
+
+model Category {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String   @unique // ชื่อของหมวดหมู่ (ต้องไม่ซ้ำกัน)
+  posts     Post[]   // ความสัมพันธ์กับ Post
+  createdAt DateTime @default(now())
+}
+
+enum Role {
+  USER
+  ADMIN
+}

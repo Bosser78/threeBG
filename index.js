@@ -1,0 +1,46 @@
+const express = require('express');
+const  cors = require('cors');
+const  bodyParser = require('body-parser');
+const  dotEnv = require('dotenv');
+
+const path = require("path");
+const { readdirSync } = require('fs');
+const morgan = require('morgan');
+
+const app = express();
+app.use(bodyParser.json());
+app.use(morgan("dev"));
+dotEnv.config({
+  path: path.resolve(process.cwd(), `.env.${process.env.NODE_ENV}`),
+});
+const PORT = process.env.PORT || 3001;
+
+// const allowedOrigins = ["http://localhost:3000", "http://localhost:3100"];
+const allowedOrigins = ["*"];
+
+// const options: cors.CorsOptions = {
+//   origin: allowedOrigins,
+// };
+// app.use(cors(options));
+app.use(cors());
+
+app.use("/api", require("./routes/auth"));
+
+app.use("/category", require("./routes/categoryRoutes"));
+// readdirSync("./routes").map((file) => {
+//   app.use("/api", require('./routes/' + file));
+// });
+
+// readdirSync("./routes").map((file) => { console.log(file); app.use("/api", require('./routes/' + file)); });
+
+
+////////////////check///////////////////////
+app.get("/hello", (req, res) => {
+  return res.status(200).send(`Hello Auth by token`);
+});
+
+app.listen(PORT, () => {
+  console.log(`server started on port ${PORT}`);
+  console.log(`DATABASE CONNECT :: ${process.env.DATABASE_URL}`);
+  console.log(`.env.${process.env.NODE_ENV}`);
+});
