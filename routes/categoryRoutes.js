@@ -9,10 +9,10 @@ const roleMiddleware = require("../middleware/roleMiddleware");
 
 
 
-categoryrouter.get("/categories", roleMiddleware(['ADMIN']),categoryController.getCategories); // อ่านหมวดหมู่ทั้งหมด
+categoryrouter.get("/categories",categoryController.getCategories); // อ่านหมวดหมู่ทั้งหมด
 categoryrouter.post("/categories", roleMiddleware(['ADMIN']),categoryController.createCategory); // สร้างหมวดหมู่ใหม่
 categoryrouter.put("/categories/:id", roleMiddleware(['ADMIN']),categoryController.updateCategory); // อัปเดตหมวดหมู่
-categoryrouter.delete("/categories/:id", roleMiddleware(['ADMIN']), categoryController.deleteCategory); // ลบหมวดหมู่
+categoryrouter.delete("/categories/:id",  roleMiddleware(['ADMIN']), categoryController.deleteCategory); // ลบหมวดหมู่
 
 module.exports = categoryrouter;
 

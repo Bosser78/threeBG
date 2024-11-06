@@ -10,7 +10,9 @@ const roleMiddleware = (roles) => {
         try {
             const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
             // ตรวจสอบว่า user มีบทบาทที่อนุญาตหรือไม่
+            req.user = decoded;
             if (!roles.includes(decoded.role)) {
+                console.log(decoded.role);
                 return res.status(403).json({ message: "Access denied: insufficient permissions" });
             }
             next(); // อนุญาตให้ดำเนินการต่อไป

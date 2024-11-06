@@ -22,11 +22,18 @@ const allowedOrigins = ["*"];
 //   origin: allowedOrigins,
 // };
 // app.use(cors(options));
+
 app.use(cors());
 
 app.use("/api", require("./routes/auth"));
 
 app.use("/category", require("./routes/categoryRoutes"));
+
+app.use("/post", require("./routes/postRoutes"));
+
+app.use("/comment", require("./routes/commentRoutes"));
+
+app.use("/user", require("./routes/userroutes"));
 // readdirSync("./routes").map((file) => {
 //   app.use("/api", require('./routes/' + file));
 // });

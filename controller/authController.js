@@ -66,6 +66,7 @@ const authController = {
 
     const accessToken = generateToken(user);
     const refreshToken = generateRefetchToken(user);
+    
 
     res.status(201).json({ accessToken, refreshToken });
   },
@@ -88,8 +89,9 @@ const authController = {
     const accessToken = generateToken(user);
     const refreshToken = generateRefetchToken(user);
     const role = user.role;
+    const userid = user.id;
 
-    res.json({ accessToken, refreshToken,role});
+    res.json({ accessToken, refreshToken,role,userid});
   },
 logoutController: async (req, res) => {
   try {

@@ -1,5 +1,6 @@
 const db = require("../utils/db");
 const jwt = require("jsonwebtoken");
+const { ObjectId } = require('mongodb');
 
 const categoryController = {
     getCategories: async (req, res) => {
@@ -28,6 +29,11 @@ const categoryController = {
             const { id } = req.params;
             const { name } = req.body;
             
+
+            if (!ObjectId.isValid(id)) {
+                return res.status(400).json({ message: "Invalid ID format" });
+            }
+
             const updatedCategory = await db.category.update({
                 where: { id },
                 data: { name },
@@ -47,6 +53,12 @@ const categoryController = {
         try {
             const { id } = req.params;
 
+
+            if (!ObjectId.isValid(id)) {
+                return res.status(400).json({ message: "Invalid ID format" });
+            }
+
+            
             const deletedCategory = await db.category.delete({
                 where: { id },
             });
