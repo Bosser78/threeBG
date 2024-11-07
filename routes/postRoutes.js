@@ -14,6 +14,10 @@ categoryrouter.get(
   roleMiddleware(["USER", "ADMIN"]),
   postController.getUserPosts
 );
+categoryrouter.get(
+  "/posts/category/:id",
+  postController.getPostsByCategory
+);
 
 
 

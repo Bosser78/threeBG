@@ -19,11 +19,21 @@ const upload = multer({ storage });
 const postController = {
   // อ่านโพสต์ทั้งหมด
   getPosts: async (req, res) => {
+    
+console.log("posts");
+    
     try {
-      const posts = await db.post.findMany({
-        include: { author: true, category: true, comments: true },
-      });
-
+    const posts = await db.post.findMany({
+      include: {
+        author: true, // ข้อมูลของผู้เขียนโพสต์
+        category: true, // ข้อมูลหมวดหมู่
+        comments: {
+          include: {
+            author: true, // รวมข้อมูลผู้ที่คอมเมนต์เพื่อดึง username มา
+          },
+        },
+      },
+    });
 const postsWithPhotos = posts.map(post => {
   return {
     ...post,
@@ -35,7 +45,7 @@ const postsWithPhotos = posts.map(post => {
 
       res.status(200).json(postsWithPhotos);
     } catch (error) {
-      res.status(500).json({ message: "INTERNAL_SERVER_ERROR" });
+      res.status(500).json({ message: "INTERNAL_SERVER_ERROR" + error });
     }
   },
 
@@ -160,10 +170,10 @@ const postsWithPhotos = posts.map(post => {
         return res.status(404).json({ message: "Post not found" });
       }
 
-      // ลบไฟล์ที่เชื่อมโยงกับโพสต์
-      if (postToDelete.file) {
-        fs.unlinkSync(path.join("uploads", postToDelete.file));
-      }
+     
+      // if (postToDelete.file) {
+      //   fs.unlinkSync(path.join({ id }, postToDelete.file));
+      // }
 
       await db.post.delete({ where: { id } });
 
@@ -195,6 +205,30 @@ const postsWithPhotos = posts.map(post => {
       res.status(500).json({ message: "Internal server error" });
     }
   },
+
+
+    getPostsByCategory: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const posts = await db.post.findMany({
+        where: { categoryId: id },
+      });
+
+      if (!posts.length) {
+        return res.status(404).json({ message: "No posts found for this category" });
+      }
+
+      res.status(200).json(posts);
+    } catch (error) {
+      console.error("Error retrieving posts by category:", error);
+      res.status(500).json({ message: "INTERNAL_SERVER_ERROR" });
+    }
+  },
+
+
+
+
+
 };
 
 // export ทั้ง postController และ middleware upload

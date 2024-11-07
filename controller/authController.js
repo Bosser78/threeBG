@@ -60,6 +60,7 @@ const authController = {
       return res.status(400).json({ message: "username already exists" });
     }
     
+
     // แฮชรหัสผ่าน
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -102,8 +103,8 @@ const authController = {
     const userid = user.id;
     const username = user.username;
     const emailL = user.email;
-
-    res.json({ accessToken, refreshToken,role,userid,username,emailL });
+    const photo = user.photo
+    res.json({ accessToken, refreshToken,role,userid,username,emailL,photo});
   },
 logoutController: async (req, res) => {
   try {
