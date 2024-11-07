@@ -1,12 +1,37 @@
 const db = require("../utils/db");
 const { ObjectId } = require("mongodb");
+const jwt = require("jsonwebtoken");
+
+const multer = require("multer");
+const fs = require("fs");
+const path = require("path");
+
+// กำหนดการจัดเก็บไฟล์ในโฟลเดอร์ "uploads"
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads");
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${Date.now()}-${file.originalname}`);
+  },
+});
+
+const upload = multer({ storage });
 
 const userController = {
   // อ่านผู้ใช้ทั้งหมด
   getUsers: async (req, res) => {
     try {
-      const users = await db.user.findMany(); // หรือ db.user.find() ขึ้นอยู่กับ ORM ที่ใช้
-      res.status(200).json(users);
+      const users = await db.user.findMany();
+
+      const usersWithPhotos = users.map(user => {
+        return {
+          ...user,
+          photoUrl: user.photo ? `/uploads/${user.photo}` : null,
+        };
+      });
+
+      res.status(200).json(usersWithPhotos);
     } catch (error) {
       res.status(500).json({ message: "INTERNAL_SERVER_ERROR" });
     }
@@ -16,70 +41,170 @@ const userController = {
   getUserById: async (req, res) => {
     try {
       const { id } = req.params;
-
-      // ตรวจสอบว่า ID ถูกต้องหรือไม่
       if (!ObjectId.isValid(id)) {
         return res.status(400).json({ message: "Invalid ID format" });
       }
 
       const user = await db.user.findUnique({
-        where: { id }, // หรือใช้ findById ขึ้นอยู่กับ ORM ที่ใช้
+        where: { id },
       });
 
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
 
-      res.status(200).json(user);
+      res.status(200).json({
+        ...user,
+        photoUrl: user.photo ? `/uploads/${user.photo}` : null,
+      });
     } catch (error) {
       res.status(500).json({ message: "INTERNAL_SERVER_ERROR" });
     }
+  },
+
+  getUserBytoken: async (req, res) => {
+    try {
+    // ตรวจสอบ token จาก header
+    const token = req.headers["authorization"]?.split(" ")[1];
+    if (!token) {
+      return res.status(401).json({ message: "No token provided" });
+    }
+
+    try {
+      // ถอดรหัส token
+      const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+      req.user = decoded;  // เก็บข้อมูลของ user ใน request
+      console.log(req.user);
+      // ตรวจสอบบทบาท (roles) ที่อนุญาต
+      // const allowedRoles = ["admin", "user"];  // เพิ่มบทบาทที่อนุญาตในที่นี้
+      // if (!allowedRoles.includes(decoded.role)) {
+      //   console.log(decoded.role);
+      //   return res.status(403).json({ message: "Access denied: insufficient permissions" });
+      // }
+
+      // ค้นหาผู้ใช้จากฐานข้อมูล โดยใช้ ID ที่มาจาก decoded token
+      const user = await db.user.findUnique({
+        where: { id: decoded.userId },
+      });
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // ส่งข้อมูลของผู้ใช้กลับ
+      res.status(200).json({
+        ...user,
+        photoUrl: user.photo ? `/uploads/${user.photo}` : null,  // ถ้ามี photo ให้แปลง URL
+      });
+
+    } catch (error) {
+      return res.status(403).json({ message: "Invalid token" });
+    }
+  } catch (error) {
+    res.status(500).json({ message: "INTERNAL_SERVER_ERROR" });
+  }
   },
 
   // สร้างผู้ใช้ใหม่
   createUser: async (req, res) => {
     try {
       const { username, password, role } = req.body;
+      const file = req.file;
 
-      // ตรวจสอบว่าได้รับข้อมูลที่ต้องการครบถ้วนหรือไม่
+      // ตรวจสอบข้อมูลที่จำเป็น
       if (!username || !password || !role) {
         return res.status(400).json({ message: "Missing required fields" });
       }
 
-      // สร้างผู้ใช้ใหม่ในฐานข้อมูล
       const newUser = await db.user.create({
-        data: { username, password, role },
+        data: {
+          username,
+          password,
+          role,
+          photo: file ? file.filename : null, // เก็บชื่อไฟล์ภาพ
+        },
       });
 
-      res.status(201).json(newUser);
+      res.status(201).json({
+        ...newUser,
+        photoUrl: newUser.photo ? `/uploads/${newUser.photo}` : null,
+      });
     } catch (error) {
+      console.error("Error creating user:", error);
       res.status(500).json({ message: "INTERNAL_SERVER_ERROR" });
     }
   },
 
   // อัปเดตข้อมูลผู้ใช้
   updateUser: async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { username, password, role } = req.body;
+    try {     
+      
+      const token = req.headers["authorization"]?.split(" ")[1];
+    if (!token) {
+      return res.status(401).json({ message: "No token provided" });
+    }
 
-      // ตรวจสอบว่า ID ถูกต้องหรือไม่
+    try {
+      const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+      req.userId = decoded.userId;
+      console.log(req.userId);
+    } catch (error) {
+
+      return res.status(403).json({ message: "Invalid token" });
+      
+    }
+      const  id  = req.userId;
+      const { username, password } = req.body;
+      const file = req.file;
+
+
+
+
       if (!ObjectId.isValid(id)) {
         return res.status(400).json({ message: "Invalid ID format" });
       }
 
-      // อัปเดตข้อมูลผู้ใช้
-      const updatedUser = await db.user.update({
-        where: { id },
-        data: { username, password, role },
-      });
+      const existingUser = await db.user.findUnique({ where: { id } });
 
-      if (!updatedUser) {
+      if (!existingUser) {
         return res.status(404).json({ message: "User not found" });
       }
 
-      res.status(200).json(updatedUser);
+      // ถ้ามีการอัปโหลดไฟล์ใหม่ ให้ลบไฟล์เดิมออก
+if (file && existingUser.photo) {
+  // ตรวจสอบว่าไฟล์ที่ต้องการลบมีอยู่จริงในระบบหรือไม่
+  const photoPath = path.join("uploads", existingUser.photo);
+  try {
+    if (fs.existsSync(photoPath)) { // ตรวจสอบว่าไฟล์มีอยู่
+      fs.unlinkSync(photoPath); // ลบไฟล์
+    }
+  } catch (error) {
+    console.error("Error deleting old file:", error);
+    return res.status(500).json({ message: "Failed to delete old file" });
+  }
+}
+
+       console.log(existingUser.photo);
+      // อัปเดตข้อมูลผู้ใช้
+      const updatedUser = await db.user.update({
+        where: { id },
+        data: {
+          username,
+          password,
+           // หาก role ต้องการอัปเดต ให้แน่ใจว่า `role` มาจาก `req.body` หรือแหล่งอื่นๆ
+    // role: req.body.role ? req.body.role : existingUser.role,  อัปเดต role ถ้ามีใน body, ไม่งั้นใช้ role เดิม
+    photo: file ? file.filename : existingUser.photo,
+    },
+      });
+      console.log(file);
+      console.log(existingUser.photo);
+      console.log(updatedUser);
+      res.status(200).json({
+        ...updatedUser,
+        photoUrl: updatedUser.photo ? `/uploads/${updatedUser.photo}` : null,
+      });
     } catch (error) {
+      console.error("Error updating user:", error);
       res.status(500).json({ message: "INTERNAL_SERVER_ERROR" });
     }
   },
@@ -88,70 +213,29 @@ const userController = {
   deleteUser: async (req, res) => {
     try {
       const { id } = req.params;
-
-      // ตรวจสอบว่า ID ถูกต้องหรือไม่
       if (!ObjectId.isValid(id)) {
         return res.status(400).json({ message: "Invalid ID format" });
       }
 
-      // ลบโพสต์ทั้งหมดที่ผู้ใช้สร้าง
-      await db.post.deleteMany({
-        where: { authorId: id }, // ลบโพสต์ทั้งหมดที่มี authorId ตรงกับ user ที่ลบ
-      });
+      const userToDelete = await db.user.findUnique({ where: { id } });
 
-      // ลบคอมเมนต์ทั้งหมดที่เกี่ยวข้องกับผู้ใช้
-      await db.comment.deleteMany({
-        where: { userId: id }, // ลบคอมเมนต์ทั้งหมดที่มี userId ตรงกับ user ที่ลบ
-      });
-
-      // ลบผู้ใช้
-      const deletedUser = await db.user.delete({
-        where: { id }, // ลบผู้ใช้จากฐานข้อมูล
-      });
-
-      if (!deletedUser) {
+      if (!userToDelete) {
         return res.status(404).json({ message: "User not found" });
       }
 
-      res.status(200).json({ message: "User and related data deleted successfully" });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ message: "INTERNAL_SERVER_ERROR" });
-    }
-  }, deleteUser: async (req, res) => {
-    try {
-      const { id } = req.params;
-
-      // ตรวจสอบว่า ID ถูกต้องหรือไม่
-      if (!ObjectId.isValid(id)) {
-        return res.status(400).json({ message: "Invalid ID format" });
+      // ลบไฟล์ที่เกี่ยวข้องกับผู้ใช้
+      if (userToDelete.photo) {
+        fs.unlinkSync(path.join("uploads", userToDelete.photo));
       }
 
-      // ลบโพสต์ทั้งหมดที่ผู้ใช้สร้าง
-      await db.post.deleteMany({
-        where: { authorId: id }, // ลบโพสต์ทั้งหมดที่มี authorId ตรงกับ user ที่ลบ
-      });
+      await db.user.delete({ where: { id } });
 
-      // ลบคอมเมนต์ทั้งหมดที่เกี่ยวข้องกับผู้ใช้
-      await db.comment.deleteMany({
-        where: { authorId: id }, // ลบคอมเมนต์ทั้งหมดที่มี authorId ตรงกับ user ที่ลบ
-      });
-
-      // ลบผู้ใช้
-      const deletedUser = await db.user.delete({
-        where: { id }, // ลบผู้ใช้จากฐานข้อมูล
-      });
-
-      if (!deletedUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      res.status(200).json({ message: "User and related data deleted successfully" });
+      res.status(200).json({ message: "User deleted successfully" });
     } catch (error) {
-      console.error(error);
       res.status(500).json({ message: "INTERNAL_SERVER_ERROR" });
     }
-  }
+  },
 };
 
-module.exports = userController;
+// export ทั้ง userController และ middleware upload
+module.exports = { userController, upload };

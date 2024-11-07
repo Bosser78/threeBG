@@ -3,6 +3,10 @@ const jwt = require("jsonwebtoken");
 const db = require("../utils/db");
 // const { PrismaClient } = require("@prisma/client");
 // const prisma = new PrismaClient();
+// const multer = require("multer");
+// const path = require("path");
+
+
 
 const generateToken = (user) => {
   return jwt.sign(
@@ -39,8 +43,13 @@ const generateRefetchToken = (user) => {
 const authController = {
   register: async (req, res) => {
     const { username, email, password ,role} = req.body;
+    // ตรวจสอบ email แบน
+    const blacklist = await db.blacklist.findFirst({ where: { email } });
+    console.log(blacklist+"blacklist");
 
-
+    if (blacklist) {
+      return res.status(400).json({ message: "Email BANNED" });
+    }
     // ตรวจสอบผู้ใช้ซ้ำ
     const existingemail = await db.user.findUnique({ where: { email } });
     if (existingemail) {
@@ -50,6 +59,7 @@ const authController = {
     if (existingUser) {
       return res.status(400).json({ message: "username already exists" });
     }
+    
     // แฮชรหัสผ่าน
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -90,8 +100,10 @@ const authController = {
     const refreshToken = generateRefetchToken(user);
     const role = user.role;
     const userid = user.id;
+    const username = user.username;
+    const emailL = user.email;
 
-    res.json({ accessToken, refreshToken,role,userid});
+    res.json({ accessToken, refreshToken,role,userid,username,emailL });
   },
 logoutController: async (req, res) => {
   try {

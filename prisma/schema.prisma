@@ -25,6 +25,7 @@ model User {
   password     String
   // refreshtoken String?
   // accesstoken  String?
+  photo        String? 
   role         Role      @default(USER)
   posts        Post[] // ความสัมพันธ์กับ Post
   comments     Comment[] // ความสัมพันธ์กับ Comment
@@ -35,6 +36,7 @@ model Post {
   id         String    @id @default(auto()) @map("_id") @db.ObjectId
   title      String
   content    String
+  file       String?
   author     User      @relation(fields: [authorId], references: [id])
   authorId   String
   category   Category? @relation(fields: [categoryId], references: [id]) // ความสัมพันธ์กับ Category
@@ -60,7 +62,14 @@ model Category {
   createdAt DateTime @default(now())
 }
 
+
 enum Role {
   USER
   ADMIN
+}
+
+model blacklist {
+  id String  @id @default(auto()) @map("_id") @db.ObjectId
+  email String?
+  
 }

@@ -1,5 +1,20 @@
 const db = require("../utils/db");
 const { ObjectId } = require("mongodb");
+const multer = require("multer");
+const fs = require("fs");
+const path = require("path");
+
+// กำหนดการจัดเก็บไฟล์ในโฟลเดอร์ "uploads"
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads");
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${Date.now()}-${file.originalname}`);
+  },
+});
+
+const upload = multer({ storage });
 
 const postController = {
   // อ่านโพสต์ทั้งหมด
@@ -8,7 +23,17 @@ const postController = {
       const posts = await db.post.findMany({
         include: { author: true, category: true, comments: true },
       });
-      res.status(200).json(posts);
+
+const postsWithPhotos = posts.map(post => {
+  return {
+    ...post,
+    photoUrl: post.file ? `/uploads/${post.file}` : null, // ใช้ post.file แทน post.photo
+  };
+});
+
+
+
+      res.status(200).json(postsWithPhotos);
     } catch (error) {
       res.status(500).json({ message: "INTERNAL_SERVER_ERROR" });
     }
@@ -30,8 +55,13 @@ const postController = {
       if (!post) {
         return res.status(404).json({ message: "Post not found" });
       }
-
-      res.status(200).json(post);
+      const postsWithPhotos = posts.map(post => {
+      return {
+        ...post,
+        photoUrl: post.file ? `/uploads/${post.file}` : null, // ใช้ post.file แทน post.photo
+      };
+    });
+      res.status(200).json(postsWithPhotos);
     } catch (error) {
       res.status(500).json({ message: "INTERNAL_SERVER_ERROR" });
     }
@@ -41,6 +71,7 @@ const postController = {
   createPost: async (req, res) => {
     try {
       const { title, content, authorId, categoryId } = req.body;
+      const file = req.file;
 
       if (
         !ObjectId.isValid(authorId) ||
@@ -49,46 +80,71 @@ const postController = {
         return res.status(400).json({ message: "Invalid ID format" });
       }
 
-      console.log({ title, content, authorId, categoryId });
-
       const newPost = await db.post.create({
-        data: { title, content, authorId, categoryId },
+        data: {
+          title,
+          content,
+          authorId,
+          categoryId,
+          file: file ? file.filename : null,
+        },
       });
 
       res.status(201).json(newPost);
     } catch (error) {
-      console.error("Error creating post:", error); // เพิ่มการแสดง error
+      console.error("Error creating post:", error);
       res.status(500).json({ message: "INTERNAL_SERVER_ERROR" });
     }
   },
 
   // อัปเดตโพสต์
   updatePost: async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { title, content, categoryId } = req.body;
+  try {
+    const { id } = req.params;
+    const { title, content, categoryId } = req.body;
+    const file = req.file;
 
-      if (
-        !ObjectId.isValid(id) ||
-        (categoryId && !ObjectId.isValid(categoryId))
-      ) {
-        return res.status(400).json({ message: "Invalid ID format" });
-      }
-
-      const updatedPost = await db.post.update({
-        where: { id },
-        data: { title, content, categoryId },
-      });
-
-      if (!updatedPost) {
-        return res.status(404).json({ message: "Post not found" });
-      }
-
-      res.status(200).json(updatedPost);
-    } catch (error) {
-      res.status(500).json({ message: "INTERNAL_SERVER_ERROR" });
+    if (
+      !ObjectId.isValid(id) ||
+      (categoryId && !ObjectId.isValid(categoryId))
+    ) {
+      return res.status(400).json({ message: "Invalid ID format" });
     }
-  },
+
+    // ค้นหาโพสต์ที่ต้องการอัปเดต
+    const existingPost = await db.post.findUnique({ where: { id } });
+
+    if (!existingPost) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    // ถ้ามีการอัปโหลดไฟล์ใหม่ ให้ลบไฟล์เดิมออก
+    if (file && existingPost.file) {
+      try {
+        fs.unlinkSync(path.join("uploads", existingPost.file));
+      } catch (error) {
+        console.error("Error deleting old file:", error);
+        return res.status(500).json({ message: "Failed to delete old file" });
+      }
+    }
+
+    // อัปเดตโพสต์ในฐานข้อมูล
+    const updatedPost = await db.post.update({
+      where: { id },
+      data: {
+        title,
+        content,
+        categoryId,
+        file: file ? file.filename : existingPost.file,
+      },
+    });
+
+    res.status(200).json(updatedPost);
+  } catch (error) {
+    console.error("Error updating post:", error);
+    res.status(500).json({ message: "INTERNAL_SERVER_ERROR" });
+  }
+},
 
   // ลบโพสต์
   deletePost: async (req, res) => {
@@ -98,13 +154,18 @@ const postController = {
         return res.status(400).json({ message: "Invalid ID format" });
       }
 
-      const deletedPost = await db.post.delete({
-        where: { id },
-      });
+      const postToDelete = await db.post.findUnique({ where: { id } });
 
-      if (!deletedPost) {
+      if (!postToDelete) {
         return res.status(404).json({ message: "Post not found" });
       }
+
+      // ลบไฟล์ที่เชื่อมโยงกับโพสต์
+      if (postToDelete.file) {
+        fs.unlinkSync(path.join("uploads", postToDelete.file));
+      }
+
+      await db.post.delete({ where: { id } });
 
       res.status(200).json({ message: "Post deleted successfully" });
     } catch (error) {
@@ -112,34 +173,29 @@ const postController = {
     }
   },
 
+  // ดึงโพสต์ของผู้ใช้
   getUserPosts: async (req, res) => {
     try {
-      // ตรวจสอบว่า req.user.id มีค่า
       const userId = req.user.userId;
-      console.log(userId);
       if (!userId) {
         return res.status(400).json({ message: "User ID is missing" });
       }
 
-      // ดึงโพสต์ของผู้ใช้จากฐานข้อมูล
       const posts = await db.post.findMany({
-        where: { authorId: userId }, // ใช้ authorId เพื่อกรองโพสต์ของผู้ใช้
-        include: { author: true, category: true, comments: true }, // รวมข้อมูลที่เกี่ยวข้อง
+        where: { authorId: userId },
+        include: { author: true, category: true, comments: true },
       });
 
-      // ถ้าไม่พบโพสต์
       if (!posts || posts.length === 0) {
-        return res
-          .status(404)
-          .json({ message: "No posts found for this user" });
+        return res.status(404).json({ message: "No posts found for this user" });
       }
 
-      res.status(200).json(posts); // ส่งโพสต์ของผู้ใช้กลับไป
+      res.status(200).json(posts);
     } catch (error) {
-      console.error(error);
       res.status(500).json({ message: "Internal server error" });
     }
   },
 };
 
-module.exports = postController;
+// export ทั้ง postController และ middleware upload
+module.exports = { postController, upload };
