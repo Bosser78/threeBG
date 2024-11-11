@@ -70,6 +70,6 @@ enum Role {
 
 model blacklist {
   id String  @id @default(auto()) @map("_id") @db.ObjectId
-  email String?
+  email String @unique
   
 }

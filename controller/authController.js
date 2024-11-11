@@ -84,7 +84,12 @@ const authController = {
 
   login: async (req, res) => {
     const { email, password } = req.body;
+    const blacklist = await db.blacklist.findFirst({ where: { email } });
+    console.log(blacklist+"blacklist");
 
+    if (blacklist) {
+      return res.status(400).json({ message: "Email BANNED" });
+    }
     // ค้นหาผู้ใช้
     const user = await db.user.findUnique({ where: { email } });
     if (!user) {

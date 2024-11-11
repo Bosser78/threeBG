@@ -1,11 +1,11 @@
-const express = require('express');
-const  cors = require('cors');
-const  bodyParser = require('body-parser');
-const  dotEnv = require('dotenv');
+const express = require("express");
+const cors = require("cors");
+const bodyParser = require("body-parser");
+const dotEnv = require("dotenv");
 
 const path = require("path");
-const { readdirSync } = require('fs');
-const morgan = require('morgan');
+const { readdirSync } = require("fs");
+const morgan = require("morgan");
 
 const app = express();
 app.use(bodyParser.json());
@@ -15,15 +15,16 @@ dotEnv.config({
 });
 const PORT = process.env.PORT || 3001;
 
-// const allowedOrigins = ["http://localhost:3000", "http://localhost:3100"];
-const allowedOrigins = ["*"];
+// // const allowedOrigins = ["http://localhost:3000", "http://localhost:3100"];
+// const allowedOrigins = ["*"];
 
-// const options: cors.CorsOptions = {
+// const options = {
 //   origin: allowedOrigins,
 // };
 // app.use(cors(options));
 
-app.use(cors());
+app.use(cors()); // อนุญาตให้ localhost:4200 เข้าถึง
+
 
 app.use("/api", require("./routes/auth"));
 
@@ -34,12 +35,13 @@ app.use("/post", require("./routes/postRoutes"));
 app.use("/comment", require("./routes/commentRoutes"));
 
 app.use("/user", require("./routes/userroutes"));
+
+app.use("/ban", require("./middleware/noaction/banRouter"));
 // readdirSync("./routes").map((file) => {
 //   app.use("/api", require('./routes/' + file));
 // });
 
 // readdirSync("./routes").map((file) => { console.log(file); app.use("/api", require('./routes/' + file)); });
-
 
 ////////////////check///////////////////////
 app.get("/hello", (req, res) => {

@@ -171,15 +171,17 @@ const postsWithPhotos = posts.map(post => {
       }
 
      
-      // if (postToDelete.file) {
-      //   fs.unlinkSync(path.join({ id }, postToDelete.file));
-      // }
+      if (postToDelete.file) {
+        fs.unlinkSync(path.join("uploads", postToDelete.file));
+      } 
+      
 
+      await db.comment.deleteMany({ where: { postId : id } });
       await db.post.delete({ where: { id } });
 
       res.status(200).json({ message: "Post deleted successfully" });
     } catch (error) {
-      res.status(500).json({ message: "INTERNAL_SERVER_ERROR" });
+      res.status(500).json({ message: "INTERNAL_SERVER_ERROR delete" });
     }
   },
 

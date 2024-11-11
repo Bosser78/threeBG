@@ -6,14 +6,18 @@ const commentController = {
     getComments: async (req, res) => {
         try {
             const comments = await db.comment.findMany({
-                include: { author: true, post: true }
+                include: { author: true }
             });
+
+            if (!comments.post) {
+                return res.status(404).json({ message: "No comments post" });
+            }
             res.status(200).json(comments);
         } catch (error) {
-            res.status(500).json({ message: "INTERNAL_SERVER_ERROR" });
+            res.status(500).json({ message: "INTERNAL_SERVER_ERROR" + error });
         }
-    },
-
+    }, //อาจแก้getComments ไม่ออก ที่ใช้อยู่คือ get post
+    
     // ดึงความคิดเห็นตาม ID
     getCommentById: async (req, res) => {
         try {
